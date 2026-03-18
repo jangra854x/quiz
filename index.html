@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Geography Ultimate Quiz</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        /* Aapka Original CSS Style yahan rahega */
+        body { font-family: 'Poppins', sans-serif; background: #0f2027; color: white; text-align: center; }
+        .card { width: 92%; max-width: 600px; margin: auto; margin-top: 30px; background: rgba(255, 255, 255, 0.05); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); }
+        button { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #111; border: none; padding: 14px 30px; border-radius: 12px; font-weight: 700; cursor: pointer; }
+        #quizBox { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>Yogesh (Max Test Series)</h1>
+    <h3>भूगोल: एक विषय के रूप में</h3>
+</div>
+
+<div id="login" class="card">
+    <h2>स्वागत है!</h2>
+    <p>टेस्ट शुरू करने के लिए नीचे दिए गए बटन पर क्लिक करें।</p>
+    <button id="startBtn" onclick="startProcess()">टेस्ट शुरू करें</button>
+</div>
+
+<div id="quizBox" class="card">
+    <div id="question"></div>
+    <div id="options"></div>
+    <br>
+    <button onclick="finishQuiz()" style="background: #ff416c; color: white;">सबमिट करें</button>
+</div>
+
+<script>
+    const tg = window.Telegram.WebApp;
+    tg.expand();
+
+    const SCRIPT_URL = "APNI_APPS_SCRIPT_URL_YAHAN_DALO"; // Apni URL yahan paste karein
+
+    // Telegram User Info (Pehle hi save kar li)
+    const user = tg.initDataUnsafe?.user || {};
+    const userId = user.id || "Unknown";
+    const username = user.username || "N/A";
+    const fullName = (user.first_name || "") + " " + (user.last_name || "");
+
+    // 🚨 Aapka Questions Array yahan aayega
+    const questions = [
+        {q: "1. 'जियोग्राफी' शब्द का प्रयोग किसने किया?", o: ["रोम", "एराटोस्थनीज", "मिस्र", "जर्मनी"], a: 1},
+        // Baaki questions...
+    ];
+
+    let currentIdx = 0;
+
+    function startProcess() {
+        const btn = document.getElementById("startBtn");
+        btn.innerText = "Processing..."; // User ko lagega loading ho rahi hai
+        btn.disabled = true;
+
+        // 🟢 STEP 1: Test shuru hone se PEHLE hi data bhej rahe hain
+        const initialData = {
+            userId: userId,
+            username: username,
+            fullName: fullName,
+            score: "Started", // Abhi score zero ya 'Started' bhej do
+            status: "Entry"
+        };
+
+        fetch(SCRIPT_URL, {
+            method: "POST",
+            mode: "no-cors",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(initialData)
+        }).then(() => {
+            // 🟢 STEP 2: Data jane ke baad quiz dikhao
+            document.getElementById("login").style.display = "none";
+            document.getElementById("quizBox").style.display = "block";
+            loadQuestion();
+        }).catch(err => {
+            // Error ki halat mein bhi quiz chalu kar sakte hain
+            console.log("Error logging entry:", err);
+            document.getElementById("login").style.display = "none";
+            document.getElementById("quizBox").style.display = "block";
+            loadQuestion();
+        });
+    }
+
+    function loadQuestion() {
+        if (currentIdx >= questions.length) { finishQuiz(); return; }
+        const qData = questions[currentIdx];
+        document.getElementById("question").innerText = qData.q;
+        const optionsDiv = document.getElementById("options");
+        optionsDiv.innerHTML = "";
+        qData.o.forEach((opt, i) => {
+            const div = document.createElement("div");
+            div.style = "background:rgba(255,255,255,0.1); padding:10px; margin:5px; cursor:pointer; border-radius:10px;";
+            div.innerText = opt;
+            div.onclick = () => { currentIdx++; loadQuestion(); };
+            optionsDiv.appendChild(div);
+        });
+    }
+
+    function finishQuiz() {
+        alert("आपका टेस्ट सबमिट हो गया है!");
+        tg.close();
+    }
+</script>
+
+</body>
+</html>
